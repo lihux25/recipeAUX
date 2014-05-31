@@ -1,0 +1,99 @@
+----------------------------------------------------------
+BUILDING/INSTALLING THE LIBRARY
+----------------------------------------------------------
+
+The "INSTALL" file contains step-by-step instructions on
+how to build and install this library.
+
+----------------------------------------------------------
+EXAMPLES OF USE
+----------------------------------------------------------
+
+There are a number of simple example programs in the 
+"examples" directory which illustrate how to calculate
+variables like mT2 in stand-along C++ programs.
+
+These should be built automatically during the build (i.e.
+when you typed "make").  The compiled programs should go 
+into the directory from which 
+you typed "make).  E.g., after building the library, you 
+should be able to do
+
+We recommend that all users of the library look first
+at the simple example program:
+
+	examples/helloWorld_Mt2_Example.cpp
+
+and then adapt it to their use.  It should have
+been compiled automatically when you built the library, 
+and so you should be able to run it like this:
+
+	./example_helloWorld_Mt2_Example
+
+See more information on this example (including how to
+compile it simply without using a makefile) at:
+
+	http://www.hep.phy.cam.ac.uk/~lester/mt2/index.html#hello
+
+More experienced users or users who need the very fastest
+MT2 implementation might like to consider reviewing a different
+example:
+
+	examples/ChengHanBisect_Mt2_332_Calculator_Example.cpp
+
+which is run with:
+
+	./example_ChengHanBisect_Mt2_332_Calculator_Example
+
+----------------------------------------------------------
+USING SEMI-INTERACTIVELY WITH ROOT
+----------------------------------------------------------
+
+After you have built and installed the library, you may be
+interested to read the insructions at the top of the file
+
+	examples/demo_1_for_ROOT_usage.C
+
+which give an example of how you could use the library
+from within ROOT.
+
+----------------------------------------------------------
+CONTACT
+----------------------------------------------------------
+The oxbridgekinematics library allows you to calculate mT2
+and other related kinamatic variables.
+
+For assistance, contact:
+
+	Alan Barr               <a.barr@physics.ox.ac.uk>
+	Christopher Lester      <lester@hep.phy.cam.ac.uk>
+
+########################################################################
+#
+#     MT2 (Stransverse Mass) Library
+#
+#     See full documentation at
+#
+#     http://www.hep.phy.cam.ac.uk/~lester/mt2/index.html
+#
+########################################################################
+
+(0) Consider reading
+
+	http://www.hep.phy.cam.ac.uk/~lester/mt2/index.html
+        https://twiki.cern.ch/twiki/bin/view/AtlasProtected/StransverseMassLibrary
+
+(1) Developers (not normal users) might like to run the test programs 
+    in the HistoricalCodebase/bin directory
+
+#######################################
+
+Maintainers:
+
+
+svn ls svn://pcfs.hep.phy.cam.ac.uk/TRUNK/ConfigureBuildExamples/mt2ExampleWithOptionalRoot
+
+(previous version is in TRUNK/NonAthenaVersion/mT2)
+
+Note the ATLAS external package lives in /afs/cern.ch/atlas/offline/external/mT2
+

@@ -1,0 +1,180 @@
+#include "recipeAUX/Muon/interface/RadialIsoCalculator.h"
+
+#include "FWCore/Framework/interface/Frameworkfwd.h"
+#include "DataFormats/Provenance/interface/ModuleDescription.h"
+#include "FWCore/ParameterSet/interface/ParameterSetfwd.h"
+
+#include "DataFormats/TrackReco/interface/Track.h"
+#include "DataFormats/GsfTrackReco/interface/GsfTrack.h"
+#include "DataFormats/TrackReco/interface/TrackFwd.h"
+#include "DataFormats/EgammaCandidates/interface/GsfElectron.h"
+#include "DataFormats/EgammaReco/interface/SuperCluster.h"
+#include "DataFormats/MuonReco/interface/Muon.h"
+#include "DataFormats/ParticleFlowCandidate/interface/PFCandidate.h"
+#include "DataFormats/ParticleFlowCandidate/interface/PFCandidateFwd.h"
+#include "DataFormats/Common/interface/RefToPtr.h"
+#include "DataFormats/VertexReco/interface/Vertex.h"
+#include "TrackingTools/IPTools/interface/IPTools.h"
+#include "DataFormats/Common/interface/RefToPtr.h"
+#include "DataFormats/MuonReco/interface/MuonSelectors.h"
+
+#include "FWCore/Framework/interface/MakerMacros.h"
+
+#include "DataFormats/RecoCandidate/interface/IsoDeposit.h"
+#include "DataFormats/RecoCandidate/interface/IsoDepositFwd.h"
+#include "PhysicsTools/IsolationAlgos/interface/IsoDepositExtractor.h"
+#include "PhysicsTools/IsolationAlgos/interface/IsoDepositExtractorFactory.h"
+#include "DataFormats/RecoCandidate/interface/IsoDepositVetos.h"
+#include "PhysicsTools/IsolationAlgos/interface/IsoDepositVetoFactory.h"
+
+#include "PhysicsTools/IsolationAlgos/interface/EventDependentAbsVeto.h"
+#include "PhysicsTools/IsolationAlgos/interface/EventDependentAbsVetos.h"
+
+#include "FWCore/Utilities/interface/InputTag.h"
+
+#include <TFile.h>
+#include <cmath>
+#include <vector>
+
+using namespace std;
+using namespace reco;
+using namespace edm;
+using namespace reco::isodeposit;
+
+typedef std::vector<std::string> vstring;
+reco::isodeposit::AbsVetos vetosTMP_;
+reco::isodeposit::EventDependentAbsVetos evdepVetosTMP_;
+
+class InputTag;
+class ParameterSet;
+class IsoDeposit;
+struct AbsVeto;
+class EventDependentAbsVeto;
+class OtherCandidatesDeltaRVeto;
+class OtherCandVeto;
+class IsoDepositVetoFactory;
+class ThresholdVeto;
+
+//--------------------------------------------------------------------------------------------------
+RadialIsoCalculator::RadialIsoCalculator(const edm::ParameterSet& pSet) {
+}
+
+//--------------------------------------------------------------------------------------------------
+RadialIsoCalculator::~RadialIsoCalculator(){}
+
+
+//--------------------------------------------------------------------------------------------------
+void RadialIsoCalculator::beginJob(const edm::ParameterSet& pSet){
+  parameters = pSet;
+
+  isodepChTag_  = parameters.getParameter<edm::InputTag>("IsoDepositChargedCollection");
+  isodepNeTag_  = parameters.getParameter<edm::InputTag>("IsoDepositNeutralCollection");
+  isodepPhTag_  = parameters.getParameter<edm::InputTag>("IsoDepositGammaCollection");
+  weightfactor_ = parameters.getParameter<double>("weightfac");
+  deltaR_       = parameters.getParameter<double>("deltaR");
+  skipDefaultVeto_ = parameters.getParameter<bool>("skipDefaultVeto");
+  debug_        = parameters.getParameter<bool>("debug");
+
+  if( debug_ ) std::cout<<"deltaR_ : "<<deltaR_<<"  weightfactor_ : "<<weightfactor_<<"  skipDefaultVeto_ : "<<skipDefaultVeto_<<std::endl;
+
+  if( debug_ ){
+     vstring vetos = parameters.getParameter< vstring >("vetos");
+     std::cout<<"vetos.size : "<<vetos.size()<<std::endl;
+     for (vstring::const_iterator it = vetos.begin(), ed = vetos.end(); it != ed; ++it) {
+        std::cout<<"  "<<it->c_str()<<std::endl;
+     }
+  }
+}
+
+
+double RadialIsoCalculator::GetIsolationValue(Event& iEvent, const EventSetup& iSetup, 
+					    const pat::Muon & mu){
+ 
+  vstring vetos = parameters.getParameter< vstring >("vetos");
+  reco::isodeposit::EventDependentAbsVeto *evdep; 
+  for (vstring::const_iterator it = vetos.begin(), ed = vetos.end(); it != ed; ++it) {
+     vetosTMP_.push_back(IsoDepositVetoFactory::make(it->c_str(), evdep));
+     if (evdep) evdepVetosTMP_.push_back(evdep);
+  }
+  for (reco::isodeposit::EventDependentAbsVetos::iterator it = evdepVetosTMP_.begin(), ed = evdepVetosTMP_.end(); it != ed; ++it) {
+     (*it)->setEvent(iEvent,iSetup);
+  }
+
+  if( debug_ ){
+     std::cout<<"   muon --> pt : "<<mu.pt()<<"  eta : "<<mu.eta()<<"  phi : "<<mu.phi()<<"  theta : "<<mu.theta()<<"  energy : "<<mu.energy()<<"  vertex : "<<mu.vertex()<<std::endl;
+     std::cout<<"   m->pfIsolationR03().sumChargedHadronPt : "<<mu.pfIsolationR03().sumChargedHadronPt<<"  m->pfIsolationR03().sumNeutralHadronEt : "<<mu.pfIsolationR03().sumNeutralHadronEt<<"  m->pfIsolationR03().sumPhotonEt : "<<mu.pfIsolationR03().sumPhotonEt<<std::endl;
+  }
+
+  double radial = 0;
+
+  const reco::CandidatePtr& muonPtr = mu.pfCandidateRef()->sourceCandidatePtr(0);
+
+// Charged Hadron
+  edm::Handle<reco::IsoDepositMap> h_isodepchMap;
+  if( debug_ ) std::cout<<"isodepChTag_ : "<<isodepChTag_<<std::endl;
+  iEvent.getByLabel(isodepChTag_, h_isodepchMap);
+
+  const reco::IsoDeposit &depch = (*h_isodepchMap)[muonPtr];
+  double valSumAlgoch = compute(depch, "SumAlgo");
+  double valSumDRAlgoch = compute(depch, "SumDRAlgo");
+  double valDiffch = valSumAlgoch-valSumDRAlgoch;
+  radial += valDiffch;
+  if( debug_ ) std::cout<<"  valSumAlgoch : "<<valSumAlgoch<<"  valSumDRAlgoch : "<<valSumDRAlgoch<<"  valDiffch : "<<valDiffch<<std::endl;
+
+// Neutral Hadron
+  edm::Handle<reco::IsoDepositMap> h_isodepneMap;
+  iEvent.getByLabel(isodepNeTag_, h_isodepneMap);
+
+  const reco::IsoDeposit &depne = (*h_isodepneMap)[muonPtr];
+  double valSumAlgone = compute(depne, "SumAlgo");
+  double valSumDRAlgone = compute(depne, "SumDRAlgo");
+  double valDiffne = valSumAlgone-valSumDRAlgone;
+  radial += valDiffne;
+  if( debug_ ) std::cout<<"  valSumAlgone : "<<valSumAlgone<<"  valSumDRAlgone : "<<valSumDRAlgone<<"  valDiffne : "<<valDiffne<<std::endl;
+
+// Photon
+  edm::Handle<reco::IsoDepositMap> h_isodepphMap;
+  iEvent.getByLabel(isodepPhTag_, h_isodepphMap);
+
+  const reco::IsoDeposit &depph = (*h_isodepphMap)[muonPtr];
+  double valSumAlgoph = compute(depph, "SumAlgo");
+  double valSumDRAlgoph = compute(depph, "SumDRAlgo");
+  double valDiffph = valSumAlgoph-valSumDRAlgoph;
+  radial += valDiffph;
+  if( debug_ ) std::cout<<"  valSumAlgoph : "<<valSumAlgoph<<"  valSumDRAlgoph : "<<valSumDRAlgoph<<"  valDiffph : "<<valDiffph<<std::endl;
+
+  for (AbsVetos::iterator it = vetosTMP_.begin(), ed = vetosTMP_.end(); it != ed; ++it) {
+     delete *it;
+  }
+  vetosTMP_.clear();
+// NOTE: we DON'T have to delete the evdepVetos_, they have already been deleted above. We just clear the vectors
+  evdepVetosTMP_.clear();
+
+  radial /= mu.pt();
+
+  if( debug_ ) std::cout<<std::endl<<std::endl;
+
+  return radial;
+}
+
+
+double RadialIsoCalculator::compute(const reco::IsoDeposit &dep, const std::string &optStr) {
+   double eta = dep.eta(), phi = dep.phi(); // better to center on the deposit direction
+  
+                                          // that could be, e.g., the impact point at calo
+   for (reco::isodeposit::AbsVetos::iterator it = vetosTMP_.begin(), ed = vetosTMP_.end(); it != ed; ++it) {
+      (*it)->centerOn(eta, phi);
+   }
+
+   if( debug_ ) std::cout<<"deltaR_ : "<<deltaR_<<"  weightfactor_ : "<<weightfactor_<<"  skipDefaultVeto_ : "<<skipDefaultVeto_<<"  vetos_.size : "<<vetosTMP_.size()<<std::endl;
+
+   double result = 0;
+   if( optStr == "SumAlgo" ){
+// Standard SumAlgo of pt (note that no weight applied!)
+      result = dep.algoWithin<reco::IsoDeposit::SumAlgo>(deltaR_, vetosTMP_, skipDefaultVeto_);
+   }else if( optStr == "SumDRAlgo" ){
+//      result = weightfactor_ * dep.algoWithin<reco::IsoDeposit::SumDRAlgo>(deltaR_, vetosTMP_, skipDefaultVeto_);
+   }
+
+   return result;
+}

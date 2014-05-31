@@ -1,0 +1,55 @@
+#ifndef RADIALISOCALCULATOR_H
+#define RADIALISOCALCULATOR_H 
+
+#include <memory>
+#include <fstream>
+#include "FWCore/Framework/interface/Frameworkfwd.h"
+#include "FWCore/Framework/interface/Event.h"
+#include "FWCore/Framework/interface/MakerMacros.h"
+#include "FWCore/ParameterSet/interface/ParameterSet.h"
+#include "FWCore/ServiceRegistry/interface/Service.h"
+#include "RecoMuon/TrackingTools/interface/MuonServiceProxy.h"
+#include "DataFormats/MuonReco/interface/MuonFwd.h"
+#include "DataFormats/VertexReco/interface/VertexFwd.h"
+#include "DataFormats/ParticleFlowCandidate/interface/PFCandidateFwd.h"
+#include "DataFormats/PatCandidates/interface/Muon.h"
+
+#include "DataFormats/RecoCandidate/interface/IsoDeposit.h"
+#include "DataFormats/RecoCandidate/interface/IsoDepositFwd.h"
+#include "PhysicsTools/IsolationAlgos/interface/IsoDepositExtractor.h"
+#include "PhysicsTools/IsolationAlgos/interface/IsoDepositExtractorFactory.h"
+#include "DataFormats/RecoCandidate/interface/IsoDepositVetos.h"
+#include "PhysicsTools/IsolationAlgos/interface/IsoDepositVetoFactory.h"
+
+#include "PhysicsTools/IsolationAlgos/interface/EventDependentAbsVeto.h"
+
+#include <vector>
+#include <TROOT.h>
+
+class RadialIsoCalculator{
+ public:
+  RadialIsoCalculator(const edm::ParameterSet&);
+  ~RadialIsoCalculator(); 
+  
+  void   beginJob(const edm::ParameterSet& pSet);
+  double GetIsolationValue(edm::Event&, const edm::EventSetup&, const pat::Muon&);
+  double compute(const reco::IsoDeposit &dep, const std::string &opt = "SumAlgo");
+  
+ private:
+  bool debug_;
+  
+  edm::ParameterSet parameters;
+  
+  double weightfactor_;
+  edm::InputTag isodepChTag_;
+  edm::InputTag isodepNeTag_;
+  edm::InputTag isodepPhTag_;
+
+  double deltaR_;
+  bool skipDefaultVeto_;
+
+//  reco::isodeposit::AbsVetos vetos_;
+//  reco::isodeposit::EventDependentAbsVetos evdepVetos_;
+};
+
+#endif

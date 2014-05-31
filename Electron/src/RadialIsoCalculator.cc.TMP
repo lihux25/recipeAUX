@@ -1,0 +1,85 @@
+#include <TFile.h>
+#include "recipeAUX/Electron/interface/RadialIsoCalculator.h"
+#include <cmath>
+#include <vector>
+
+using namespace std;
+
+#include "DataFormats/TrackReco/interface/Track.h"
+#include "DataFormats/GsfTrackReco/interface/GsfTrack.h"
+#include "DataFormats/TrackReco/interface/TrackFwd.h"
+#include "DataFormats/EgammaCandidates/interface/GsfElectron.h"
+#include "DataFormats/EgammaReco/interface/SuperCluster.h"
+#include "DataFormats/EgammaCandidates/interface/Electron.h"
+#include "DataFormats/ParticleFlowCandidate/interface/PFCandidate.h"
+#include "DataFormats/ParticleFlowCandidate/interface/PFCandidateFwd.h"
+#include "DataFormats/Common/interface/RefToPtr.h"
+#include "DataFormats/VertexReco/interface/Vertex.h"
+#include "TrackingTools/IPTools/interface/IPTools.h"
+#include "DataFormats/Common/interface/RefToPtr.h"
+
+#include "FWCore/Framework/interface/MakerMacros.h"
+
+#include "DataFormats/RecoCandidate/interface/IsoDeposit.h"
+#include "DataFormats/RecoCandidate/interface/IsoDepositFwd.h"
+#include "PhysicsTools/IsolationAlgos/interface/IsoDepositExtractor.h"
+#include "PhysicsTools/IsolationAlgos/interface/IsoDepositExtractorFactory.h"
+
+#include "DataFormats/PatCandidates/interface/Electron.h"
+
+using namespace reco;
+using namespace edm;
+
+//--------------------------------------------------------------------------------------------------
+RadialIsoCalculator::RadialIsoCalculator(const ParameterSet& pSet) {
+
+  // Parameters to set the IsoDeposits  
+  parameters = pSet;
+}
+
+//--------------------------------------------------------------------------------------------------
+RadialIsoCalculator::~RadialIsoCalculator(){}
+
+//--------------------------------------------------------------------------------------------------
+void RadialIsoCalculator::beginJob(){
+  
+  isodepChTag_ = parameters.getParameter<InputTag>("IsoDepositChargedCollection");
+  isodepNeTag_ = parameters.getParameter<InputTag>("IsoDepositNeutralCollection");
+  isodepPhTag_ = parameters.getParameter<InputTag>("IsoDepositGammaCollection");
+  weightfactor = parameters.getParameter<double>("weightfac");
+}
+
+double RadialIsoCalculator::GetIsolationValue(Event& iEvent, const EventSetup& iSetup, 
+					    const pat::Electron& ele){
+  
+  Handle<reco::IsoDeposit> isodepch;
+  iEvent.getByLabel(isodepChTag_, isodepch);
+
+  Handle<reco::IsoDeposit> isodepne;
+  iEvent.getByLabel(isodepNeTag_, isodepne);
+
+  Handle<reco::IsoDeposit> isodepph;
+  iEvent.getByLabel(isodepPhTag_, isodepph);
+  
+  double radial = 0;
+  for (IsoDeposit::const_iterator iD = isodepch->begin(); iD != isodepch->end(); ++iD){
+    if (iD.dR() < 0.01) continue;
+    if (iD.dR() < 0.3)  continue;
+    radial += (iD.value() - weightfactor * iD.dR()) / ele.pt(); 
+  }
+  for (IsoDeposit::const_iterator iD = isodepne->begin(); iD != isodepne->end(); ++iD){
+    if (iD.dR() < 0.01)   continue;
+    if (iD.dR() < 0.3)    continue;
+    if (iD.value() < 1.0) continue;
+    radial += (iD.value() - weightfactor * iD.dR()) / ele.pt(); 
+  }
+  for (IsoDeposit::const_iterator iD = isodepph->begin(); iD != isodepph->end(); ++iD){
+    if (iD.dR() < 0.01)   continue;
+    if (iD.dR() < 0.3)    continue;
+    if (iD.value() < 1.0) continue;
+    radial += (iD.value() - weightfactor * iD.dR()) / ele.pt(); 
+  }
+
+  return radial;
+}
+
